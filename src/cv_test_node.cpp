@@ -20,7 +20,7 @@ public:
     : it_(nh_)
   {
     // Subscrive to input video feed and publish output video feed
-    image_sub_ = it_.subscribe("morph/cam1/image_raw", 1,
+    image_sub_ = it_.subscribe("cam0/throttled", 1,
       &ImageConverter::imageCb, this);
 
     cv::namedWindow(OPENCV_WINDOW);
@@ -44,24 +44,42 @@ public:
       return;
     }
 
-    cv::Mat gray;
+    cv::Mat gray, out;
     std::vector<cv::Point2f> corners;
 
     cv::cvtColor( cv_ptr->image, gray, CV_RGB2GRAY );
 
-    cv::goodFeaturesToTrack(gray, corners, 100, 0.01, 1);
+    cv::goodFeaturesToTrack(gray, corners, 200, 0.01, 1);
+
+
+    out = cv_ptr->image.clone();
+    out.setTo(0);
+
+    int prad = 15;
+    for (const auto corner : corners)
+    {
+      if (corner.x < out.cols - prad && corner.x > prad &&
+          corner.y < out.rows - prad && corner.y > prad)
+      {
+        //out(cv::Rect(corner.x, corner.y, 2*prad+1, 2*prad+1)) =
+        //    cv_ptr->image(cv::Rect(corner.x, corner.y, 2*prad+1, 2*prad+1));
+        cv_ptr->image(cv::Rect(corner.x - prad - 1, corner.y - prad - 1, 2*prad+1, 2*prad+1)).copyTo(out(cv::Rect(corner.x - prad - 1, corner.y - prad - 1, 2*prad+1, 2*prad+1)));
+      }
+    }
 
     int r = 4;
-    for( int i = 0; i < corners.size(); i++ )
+    for (const auto corner : corners)
     {
-      cv::circle( cv_ptr->image,
-                  corners[i],
-                  r,
-                  CV_RGB(255, 0, 0) );
+      if (corner.x < out.cols - prad && corner.x > prad &&
+          corner.y < out.rows - prad && corner.y > prad)
+        cv::circle( out,
+                    corner,
+                    r,
+                    CV_RGB(255, 0, 0) );
     }
 
     // Update GUI Window
-    cv::imshow(OPENCV_WINDOW, cv_ptr->image);
+    cv::imshow(OPENCV_WINDOW, out);//cv_ptr->image);
     cv::waitKey(3);
   }
 };
